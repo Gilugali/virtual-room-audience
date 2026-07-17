@@ -1,0 +1,25 @@
+{
+  "name": "com.virtualroom.audience",
+  "version": "0.2.0",
+  "displayName": "Virtual Room — Audience",
+  "description": "A simulated live audience for public-speaking apps. Fills a room with reactive people who clap, cheer, laugh, nod — or yawn and check out if you lose them. Pick a venue (theatre, classroom, conference hall, comedy club) and drive reactions from your own code. Works in VR, on desktop, and in WebGL builds. Drop in one component and go.",
+  "unity": "2021.3",
+  "keywords": [
+    "audience",
+    "public-speaking",
+    "crowd",
+    "vr",
+    "simulation",
+    "venues"
+  ],
+  "author": {
+    "name": "Virtual Room"
+  },
+  "samples": [
+    {
+      "displayName": "Quick Start",
+      "description": "A room, an audience, and keyboard keys to react to. Start here.",
+      "path": "Samples~/QuickStart"
+    }
+  ]
+}

@@ -1,0 +1,324 @@
+@implements IDisposable
+@inject IJSRuntime Js
+
+<div class="stage">
+    <canvas id="stage"></canvas>
+
+    <div class="hud">
+        <div class="hud-mood">@_room.MoodLabel</div>
+        <div class="hud-meters">
+            <div class="hud-meter"><i style="width:@Pct(_room.Mood.Engagement); background:#6fb1e8"></i></div>
+            <div class="hud-meter"><i style="width:@Pct(_room.Mood.Warmth); background:#f2628f"></i></div>
+            <div class="hud-meter"><i style="width:@Pct(_room.ApplauseMeter); background:#ffd640"></i></div>
+        </div>
+        <div class="hud-legend">attention @Pct(_room.Mood.Engagement) · warmth @Pct(_room.Mood.Warmth) · applause @Pct(_room.ApplauseMeter)</div>
+    </div>
+
+    @if (_waveAge < WaveBannerSeconds && _waveText != null)
+    {
+        <div class="banner" style="opacity:@F(1f - _waveAge / WaveBannerSeconds); color:@_waveColor">@_waveText</div>
+    }
+
+    <div class="viewtoggle">
+        <button class="@(_view == "podium" ? "on" : "")" @onclick='() => SetView("podium")'>Podium view</button>
+        <button class="@(_view == "room" ? "on" : "")" @onclick='() => SetView("room")'>Room view</button>
+        <span class="drag-hint">drag to look around</span>
+    </div>
+</div>
+
+<div class="panels">
+
+    <div class="panel">
+        <h2>Your voice</h2>
+
+        <div class="btns" style="margin-bottom:12px">
+            <button class="@(_micOn ? "live" : "primary")" @onclick="ToggleMic">
+                @(_micOn ? "🎙 Listening — talk to them" : "🎙 Use my microphone")
+            </button>
+        </div>
+
+        <div class="row">
+            <span>Energy</span>
+            <input type="range" min="0" max="1" step="0.01" disabled="@_micOn"
+                   value="@_manualEnergy" @oninput="e => _manualEnergy = ParseFloat(e, _manualEnergy)" />
+            <output>@Pct(_speakerEnergy)</output>
+        </div>
+
+        <p class="hint">
+            With the mic on the room reacts to your actual voice: speak up and heads lift, trail off
+            and you watch them sink one by one. (Browsers only allow the mic on <code>localhost</code>
+            or https.)
+        </p>
+
+        <h2 style="margin-top:18px">Tune the crowd — live</h2>
+
+        <div class="row">
+            <span>Contagion</span>
+            <input type="range" min="0" max="3.5" step="0.05" value="@_config.ContagionGain"
+                   @oninput="e => _config.ContagionGain = ParseFloat(e, _config.ContagionGain)" />
+            <output>@_config.ContagionGain.ToString("0.00")</output>
+        </div>
+
+        <div class="row">
+            <span>People</span>
+            <input type="range" min="6" max="40" step="1" value="@_config.Size"
+                   @onchange="Repopulate" />
+            <output>@_config.Size</output>
+        </div>
+
+        <div class="row">
+            <span>Kind mode</span>
+            <input type="checkbox" checked="@(!_config.AllowNegativeReactions)"
+                   @onchange="e => _config.AllowNegativeReactions = !(bool)e.Value" />
+            <span style="width:auto; flex:1">nobody yawns, gets confused, or checks out</span>
+        </div>
+
+        <p class="hint">
+            Drag <b>Contagion</b> to 0 and the applause stops spreading — it becomes thirty people
+            clapping on their own private schedules, and the room dies. That one number is the
+            difference between a crowd and a spreadsheet.
+        </p>
+    </div>
+
+    <div class="panel">
+        <h2>Talk to the room</h2>
+
+        <div class="btns" style="margin-bottom:14px">
+            <button @onclick="() => Cue(SpeakerCue.Greeting)">Greeting</button>
+            <button @onclick="() => Cue(SpeakerCue.Joke)">Joke</button>
+            <button @onclick="() => Cue(SpeakerCue.KeyPoint)">Key point</button>
+            <button @onclick="() => Cue(SpeakerCue.Question)">Ask them</button>
+            <button @onclick="() => Cue(SpeakerCue.Pause)">Dramatic pause</button>
+            <button @onclick="() => Cue(SpeakerCue.Stumble)">Stumble</button>
+            <button @onclick="() => Cue(SpeakerCue.Silence)">Dead air</button>
+            <button class="primary" @onclick="() => Cue(SpeakerCue.StrongFinish)">Strong finish</button>
+        </div>
+
+        <h2>Force it</h2>
+        <div class="btns">
+            <button @onclick="() => _room.Applaud()">Applaud</button>
+            <button @onclick="() => _room.Cheer()">Cheer</button>
+            <button @onclick="() => _room.TriggerReaction(ReactionType.Question, 1f, 0.35f)">Hands up</button>
+            <button @onclick="Reset">Reset</button>
+        </div>
+
+        <p class="hint">
+            The room is a simulation, not a script. A cue is an <i>invitation</i> — a cold room won't
+            laugh at your joke just because you told one. Warm them up first and watch the same joke
+            land completely differently.
+        </p>
+    </div>
+</div>
+
+@code {
+    const float WaveBannerSeconds = 2.0f;
+
+    // A classroom, like the one you're aiming at: flat floor, arced rows of desks.
+    readonly RoomConfig _config = new RoomConfig
+    {
+        Size = 24,
+        Seed = 0,
+        StartingMood = RoomMoodPreset.Polite,
+    };
+
+    readonly SeatingSettings _seating = new SeatingSettings
+    {
+        Style = SeatingStyle.Classroom,
+        FrontRowRadius = 3.6f,
+        RowSpacing = 1.9f,
+        SeatSpacing = 1.65f,   // desks need elbow room
+        AisleWidth = 1.3f,
+        RiserHeight = 0f,      // a classroom floor is flat
+        Jitter = 0.05f,
+    };
+
+    AudienceRoom _room;
+
+    float[] _state = new float[0];
+    float _manualEnergy = 0.45f;
+    float _speakerEnergy;
+    bool _micOn;
+    string _view = "podium";
+
+    string _waveText;
+    string _waveColor = "#ffd640";
+    float _waveAge = 99f;
+
+    bool _running = true;
+    bool _sceneReady;
+
+    protected override void OnInitialized()
+    {
+        _room = new AudienceRoom(_config, _seating);
+        _room.Waved += OnWaved;
+        _state = new float[_room.Count * 4];
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        // scene.js is an ES module, so it may still be evaluating when Blazor finishes booting.
+        for (int i = 0; i < 100 && !await Js.InvokeAsync<bool>("vrReady"); i++)
+        {
+            await Task.Delay(50);
+        }
+
+        await Js.InvokeVoidAsync("vrScene.init", "#stage", Seats(), Palette());
+        _sceneReady = true;
+
+        _ = Loop();
+    }
+
+    async Task Loop()
+    {
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        double last = 0;
+
+        while (_running)
+        {
+            await Task.Delay(16);   // the sim is delta-time driven, so this rate is just a sampling choice
+
+            double now = clock.Elapsed.TotalSeconds;
+            float dt = (float)(now - last);
+            last = now;
+
+            _speakerEnergy = _micOn ? await Js.InvokeAsync<float>("vrMic.level") : _manualEnergy;
+            _room.Speaker.Energy = _speakerEnergy;
+
+            _room.Tick(dt);
+            _waveAge += dt;
+
+            if (_sceneReady) await Js.InvokeVoidAsync("vrScene.update", BuildState());
+
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// The bridge to the renderer: four numbers per person, in Members order. Deliberately a flat
+    /// float array rather than objects — this crosses the WASM/JS boundary 60 times a second.
+    /// </summary>
+    float[] BuildState()
+    {
+        if (_state.Length != _room.Count * 4) _state = new float[_room.Count * 4];
+
+        for (int i = 0; i < _room.Count; i++)
+        {
+            AudienceMember m = _room.Members[i];
+            int o = i * 4;
+
+            _state[o] = (float)(int)m.CurrentReaction;
+            _state[o + 1] = m.ReactionIntensity;
+            _state[o + 2] = Progress(m);
+            _state[o + 3] = m.Attention;
+        }
+
+        return _state;
+    }
+
+    static float Progress(AudienceMember m)
+    {
+        if (!m.IsReacting) return 1f;
+
+        float total = Reactions.DurationOf(m.CurrentReaction);
+        return total <= 0f ? 1f : Math.Max(0f, Math.Min(1f, 1f - m.ReactionTimeLeft / total));
+    }
+
+    /// <summary>
+    /// Hex colour per ReactionType, indexed by the enum value. Handed to the renderer once at
+    /// startup so the palette has exactly one home: Reactions.ColorOf, shared with the Unity build.
+    /// </summary>
+    static string[] Palette()
+    {
+        var all = (ReactionType[])Enum.GetValues(typeof(ReactionType));
+        var hex = new string[all.Length];
+
+        foreach (ReactionType r in all) hex[(int)r] = Reactions.ColorOf(r).ToHex();
+
+        return hex;
+    }
+
+    /// <summary>Seat positions, flat: x, y, z, facing — straight out of the shared SeatingLayout.</summary>
+    float[] Seats()
+    {
+        var seats = new float[_room.Count * 4];
+
+        for (int i = 0; i < _room.Count; i++)
+        {
+            SeatPosition s = _room.Members[i].Seat;
+            seats[i * 4] = s.X;
+            seats[i * 4 + 1] = s.Y;
+            seats[i * 4 + 2] = s.Z;
+            seats[i * 4 + 3] = s.FacingRadians;
+        }
+
+        return seats;
+    }
+
+    void OnWaved(WaveEvent w)
+    {
+        _waveText = w.Reaction switch
+        {
+            ReactionType.Applause => "the room bursts into applause",
+            ReactionType.Cheer => "the room is cheering",
+            ReactionType.Laugh => "the room laughs",
+            ReactionType.Nod => "the room is nodding along",
+            ReactionType.Question => "hands go up across the room",
+            ReactionType.Yawn => "the room is yawning",
+            ReactionType.Distracted => "you've lost the room",
+            ReactionType.Confused => "the room looks lost",
+            _ => $"the room: {w.Reaction}",
+        };
+
+        _waveColor = Reactions.ColorOf(w.Reaction).ToHex();
+        _waveAge = 0f;
+    }
+
+    // --- controls ---------------------------------------------------------
+
+    void Cue(SpeakerCue cue) => _room.Cue(cue);
+
+    void Reset()
+    {
+        _room.Reset();
+        _waveAge = 99f;
+    }
+
+    async Task SetView(string mode)
+    {
+        _view = mode;
+        await Js.InvokeVoidAsync("vrScene.setView", mode);
+    }
+
+    async Task Repopulate(ChangeEventArgs e)
+    {
+        if (!int.TryParse(e.Value?.ToString(), out int size)) return;
+
+        _config.Size = size;
+        _room.Populate(size);
+        _state = new float[_room.Count * 4];
+
+        if (_sceneReady) await Js.InvokeVoidAsync("vrScene.seat", Seats());
+    }
+
+    async Task ToggleMic()
+    {
+        if (_micOn) { _micOn = false; return; }
+        _micOn = await Js.InvokeAsync<bool>("vrMic.start");
+    }
+
+    static float ParseFloat(ChangeEventArgs e, float fallback) =>
+        float.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture, out float v) ? v : fallback;
+
+    static string F(float v) => v.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+
+    static string Pct(float v) => $"{(int)(Math.Max(0f, Math.Min(1f, v)) * 100f)}%";
+
+    public void Dispose()
+    {
+        _running = false;
+        if (_room != null) _room.Waved -= OnWaved;
+    }
+}

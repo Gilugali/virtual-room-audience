@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <!--
+    A playable, in-browser preview of the audience.
+
+        dotnet run          → http://localhost:5000
+        dotnet publish -c Release -o out   → out/wwwroot is a plain static site
+
+    IMPORTANT: this compiles the REAL simulation, straight from ../Runtime/Core and
+    ../Runtime/Simulation (see the Compile items below). It is not a mock and not a port — the crowd
+    you see in the browser is running the exact same C# that the Unity package runs, which is the
+    entire reason those folders were kept free of any UnityEngine dependency.
+
+    Only the *drawing* is web-specific. Unity draws capsules in 3D; this draws circles in SVG.
+
+    The folder ends in ~ so that Unity ignores it and never tries to compile Blazor.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <RootNamespace>VirtualRoom.WebPreview</RootNamespace>
+    <Nullable>disable</Nullable>
+    <LangVersion>9.0</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="6.0.*" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="6.0.*" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="../Runtime/Core/**/*.cs" />
+    <Compile Include="../Runtime/Simulation/**/*.cs" />
+  </ItemGroup>
+
+</Project>

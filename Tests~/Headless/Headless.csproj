@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Runs the audience simulation WITHOUT Unity, straight from the package source.
+
+        dotnet run
+
+    The simulation core has no UnityEngine dependency precisely so this is possible: you can change
+    a contagion number, run this in a second, and see whether the room still behaves like a room —
+    instead of opening the editor, pressing Play, and squinting at capsules.
+
+    The folder is named "Tests~" because Unity ignores any folder ending in ~, so this .csproj will
+    never confuse the Unity compiler.
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <LangVersion>9.0</LangVersion>
+    <AssemblyName>audience-checks</AssemblyName>
+    <RootNamespace>VirtualRoom.Audience.Tests</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../../Runtime/Core/**/*.cs" />
+    <Compile Include="../../Runtime/Simulation/**/*.cs" />
+    <Compile Include="Program.cs" />
+  </ItemGroup>
+
+</Project>
