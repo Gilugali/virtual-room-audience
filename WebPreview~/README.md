@@ -2,9 +2,9 @@
 
 A 3D classroom seen from the podium, in your browser, with no Unity.
 
-It runs the **real simulation** — `../Runtime/Core` and `../Runtime/Simulation` compiled to
-WebAssembly. Who claps, when, and how it spreads is decided by the same C# the Unity package runs.
-`scene.js` only draws.
+It runs the **real simulation**. `../Runtime/Core` and `../Runtime/Simulation` are compiled to
+WebAssembly, so who claps, when, and how it spreads is decided by the same C# the Unity package
+runs. `scene.js` only draws.
 
 ## Run it
 
@@ -21,21 +21,21 @@ dotnet publish -c Release -o out
 node serve.js ./out/wwwroot 5080  # → http://localhost:5080
 ```
 
-Use `serve.js`, not `python -m http.server` — Blazor won't boot unless `.wasm` is served as
+Use `serve.js`, not `python -m http.server`. Blazor won't boot unless `.wasm` is served as
 `application/wasm`, and python gets that wrong.
 
 ## What to try
 
-1. **Drag the view** — look around the room, like turning your head at a podium.
+1. **Drag the view.** Look around the room, like turning your head at a podium.
 2. **Click 🎙 Use my microphone, then speak.** The room reacts to your real voice. Get loud and
    heads lift. Trail off and they sink, one at a time.
 3. **Click Strong finish, switch to Room view, do it again.** From above you can see the applause
-   *spread* — it starts somewhere and travels, instead of everyone clapping on the same frame.
+   *spread*. It starts somewhere and travels, instead of everyone clapping on the same frame.
 4. **Drag Contagion to 0.** The spread stops dead. Now it's 24 people clapping on their own private
    schedules, and the room stops feeling like a room.
 5. **Stop talking.** Watch them fold forward and turn away.
 
-Mic only works on `localhost` or https — a browser rule. Locally it just works.
+Mic only works on `localhost` or https. That's a browser rule. Locally it just works.
 
 ## Using your own characters
 
@@ -44,33 +44,33 @@ Mic only works on `localhost` or https — a browser rule. Locally it just works
 3. Add the filename to `MODEL_FILES` in `wwwroot/scene.js` (around line 203).
 
 That's it. Height, hip position, and bone names are **measured from the model at load**, not
-assumed — so a character exported at 2 units tall with Mixamo bone names sits at the right desk
-with no tuning. If a model uses bone names nothing recognises, it tells you the name instead of
-quietly seating a statue.
+assumed. So a character exported at 2 units tall with Mixamo bone names sits at the right desk with
+no tuning. If a model uses bone names nothing recognises, it tells you the name instead of quietly
+seating a statue.
 
-Works with Meshy/Tripo/Rodin output, Mixamo, Ready Player Me, Synty, or your own.
+Works with Meshy, Tripo, or Rodin output, plus Mixamo, Ready Player Me, Synty, or your own.
 
-**In Unity**, do it differently: set `memberPrefab` on the `AudienceRoomBehaviour`. If the model
+**In Unity** you do it differently. Set `memberPrefab` on the `AudienceRoomBehaviour`. If the model
 has an `Animator`, the package fires a trigger named after each reaction (`"Applause"`, `"Laugh"`,
-`"Yawn"`…). Leave it empty and you get the built-in plain characters.
+`"Yawn"`). Leave it empty and you get the built-in plain characters.
 
 Swapping characters never changes the simulation.
 
 ## About the avatars
 
 The eight people in `wwwroot/models/` are real rigged characters from Quaternius' *Ultimate
-Modular* packs, [CC0](https://quaternius.com) — public domain, use them for anything, no
+Modular* packs, [CC0](https://quaternius.com). Public domain. Use them for anything, no
 attribution needed.
 
-They ship in a T-pose with **no animation clips**. Everything they do — sitting, clapping, raising
-a hand, yawning — is built in `scene.js` by rotating bones. Two things make that work:
+They ship in a T-pose with **no animation clips**. Everything they do is built in `scene.js` by
+rotating bones: sitting, clapping, raising a hand, yawning. Two things make that work:
 
-- **Poses are written in the character's own frame** (+Z = facing), and `pose()` converts to
-  whatever frame each bone actually has. Without this a clap comes out as a shrug.
-- **`BONES` maps each slot to the names every pipeline uses** — Quaternius, Mixamo, Ready Player
-  Me, Unreal. That's what makes adding a model a two-line change.
+- **Poses are written in the character's own frame** (+Z is where they face), and `pose()` converts
+  that to whatever frame each bone actually has. Without this, a clap comes out as a shrug.
+- **`BONES` maps each slot to the names every pipeline uses**: Quaternius, Mixamo, Ready Player Me,
+  Unreal. That's what makes adding a model a two-line change.
 
 ## The catch
 
-This previews the **simulation and the room**, not the Unity scene. No VR here. But every number
-and behaviour you see is what your Unity build does — it's the same code.
+This previews the **simulation and the room**, not the Unity scene. There is no VR here. But every
+number and behaviour you see is what your Unity build does, because it's the same code.
